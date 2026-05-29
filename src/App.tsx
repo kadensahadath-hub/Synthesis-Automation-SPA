@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { motion, Variants } from 'framer-motion';
+import { useState, useRef, useEffect } from 'react';
+import { motion, Variants, useInView, animate } from 'framer-motion';
 import { Zap, ChevronDown, ArrowRight } from 'lucide-react';
 
 const containerVariants: Variants = {
@@ -57,12 +57,102 @@ function isGenericDomain(email: string): boolean {
   return GENERIC_DOMAINS.includes(domain);
 }
 
+interface CounterProps {
+  value: number;
+  suffix?: string;
+  decimals?: number;
+}
+
+function Counter({ value, suffix = '', decimals = 0 }: CounterProps) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true, margin: '-50px' });
+
+  useEffect(() => {
+    if (!isInView) return;
+
+    const controls = animate(0, value, {
+      duration: 2.0,
+      ease: 'easeOut',
+      onUpdate: (latest) => {
+        setCount(latest);
+      },
+    });
+
+    return () => controls.stop();
+  }, [value, isInView]);
+
+  return (
+    <span ref={ref}>
+      {count.toFixed(decimals)}
+      {suffix}
+    </span>
+  );
+}
+
+function FloatingParticles() {
+  const [particles] = useState(() =>
+    Array.from({ length: 25 }, (_, i) => ({
+      id: i,
+      size: Math.random() * 3 + 1,
+      x: Math.random() * 100,
+      duration: Math.random() * 15 + 15,
+      delay: Math.random() * -20,
+    }))
+  );
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+      {particles.map((p) => (
+        <motion.div
+          key={p.id}
+          className="absolute rounded-full bg-cyan-400/20"
+          style={{
+            width: p.size,
+            height: p.size,
+            left: `${p.x}%`,
+            bottom: `-5%`,
+          }}
+          animate={{
+            y: [0, -1200],
+            x: [0, Math.random() * 60 - 30, 0],
+            opacity: [0, 0.7, 0.7, 0],
+          }}
+          transition={{
+            duration: p.duration,
+            repeat: Infinity,
+            delay: p.delay,
+            ease: 'linear',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [openFaq, setOpenFaq] = useState(0);
   const auditFormRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      containerRef.current.style.setProperty('--mouse-x', `${x}px`);
+      containerRef.current.style.setProperty('--mouse-y', `${y}px`);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
 
   const scrollToAuditForm = () => {
     auditFormRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -145,24 +235,57 @@ function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-slate-100">
+    <div ref={containerRef} className="relative min-h-screen bg-background text-slate-100 overflow-hidden">
+      {/* Background patterns & spotlights */}
+      <div className="absolute inset-0 grid-overlay opacity-30 z-0 pointer-events-none" />
+      <div className="absolute inset-0 spotlight-overlay z-0 pointer-events-none" />
+
+      {/* Floating Orbs */}
+      <motion.div
+        animate={{
+          x: [0, 50, -30, 0],
+          y: [0, -40, 30, 0],
+        }}
+        transition={{
+          duration: 25,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+        className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-cyan-500/5 blur-[120px] pointer-events-none z-0"
+      />
+      <motion.div
+        animate={{
+          x: [0, -40, 40, 0],
+          y: [0, 30, -30, 0],
+        }}
+        transition={{
+          duration: 20,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+        className="absolute bottom-[20%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-teal-500/5 blur-[120px] pointer-events-none z-0"
+      />
+
+      {/* Floating Particles */}
+      <FloatingParticles />
+
       {/* Navigation Header */}
       <motion.header
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="sticky top-0 z-50 w-full border-b border-slate-800 bg-background/95 backdrop-blur-sm"
+        className="sticky top-0 z-50 w-full border-b border-slate-800/80 bg-background/90 backdrop-blur-md"
       >
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Zap className="w-6 h-6 text-cyan-400" />
-            <span className="text-lg font-medium text-slate-100">
+            <Zap className="w-6 h-6 text-cyan-400 animate-pulse" />
+            <span className="text-lg font-medium text-slate-100 font-sans tracking-wide">
               Synthesis Automation
             </span>
           </div>
           <button
             onClick={scrollToAuditForm}
-            className="text-slate-400 hover:text-cyan-400 text-sm underline underline-offset-4 transition-colors duration-200"
+            className="text-slate-400 hover:text-cyan-400 text-sm font-medium tracking-wide transition-colors duration-200 cursor-pointer"
           >
             Request Audit
           </button>
@@ -170,7 +293,7 @@ function App() {
       </motion.header>
 
       {/* Hero Section */}
-      <section className="py-20 md:py-32 px-6">
+      <section className="relative z-10 py-20 md:py-32 px-6">
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -179,10 +302,9 @@ function App() {
         >
           <motion.h1
             variants={itemVariants}
-            className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-100 leading-tight mb-8"
+            className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-slate-100 leading-tight mb-8 tracking-tight"
           >
-            We design custom AI workflows to stabilize and scale your
-            operations.
+            We design custom AI workflows to stabilize and scale your operations.
           </motion.h1>
           <motion.p
             variants={itemVariants}
@@ -198,106 +320,143 @@ function App() {
             ref={auditFormRef}
             id="audit-form"
             variants={itemVariants}
-            className="bg-surface border border-slate-700 p-8 md:p-10 rounded-none text-left max-w-2xl mx-auto"
+            className="glowing-border-container max-w-2xl mx-auto"
           >
-            <h2 className="text-2xl font-bold text-slate-100 mb-4">
-              Free Automation Audit
-            </h2>
-            <p className="text-slate-400 leading-relaxed mb-8">
-              We review your current software stack and manual workflows to
-              identify every viable integration opportunity. The resulting
-              engineering blueprint belongs to you — regardless of whether we
-              work together.
-            </p>
+            <div className="glowing-border-inner bg-surface/95 backdrop-blur-sm p-8 md:p-10 text-left border border-slate-800/80">
+              <h2 className="text-2xl font-bold text-slate-100 mb-4 tracking-tight">
+                Free Automation Audit
+              </h2>
+              <p className="text-slate-400 leading-relaxed mb-8">
+                We review your current software stack and manual workflows to
+                identify every viable integration opportunity. The resulting
+                engineering blueprint belongs to you — regardless of whether we
+                work together.
+              </p>
 
-            {success ? (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-cyan-500/10 border border-cyan-500/30 p-6"
-              >
-                <p className="text-cyan-400 font-medium">
-                  You're confirmed. We'll be in touch within one business day to
-                  schedule your 15-minute intro call.
-                </p>
-              </motion.div>
-            ) : (
-              <form onSubmit={handleSubmit}>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1">
-                    <label
-                      htmlFor="email"
-                      className="block text-sm font-medium text-slate-400 mb-2"
-                    >
-                      Business Email
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@company.com"
-                      className="w-full bg-background border border-slate-700 focus:border-cyan-500 text-slate-100 px-4 py-3 outline-none transition-colors duration-200 rounded-none"
-                    />
+              {success ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-cyan-500/10 border border-cyan-500/30 p-6"
+                >
+                  <p className="text-cyan-400 font-medium">
+                    You're confirmed. We'll be in touch within one business day to
+                    schedule your 15-minute intro call.
+                  </p>
+                </motion.div>
+              ) : (
+                <form onSubmit={handleSubmit}>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1">
+                      <label
+                        htmlFor="email"
+                        className="block text-sm font-medium text-slate-400 mb-2"
+                      >
+                        Business Email
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="you@company.com"
+                        className="w-full bg-background border border-slate-700 focus:border-cyan-500 text-slate-100 px-4 py-3 outline-none transition-colors duration-200 rounded-none focus:ring-1 focus:ring-cyan-500"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <motion.button
+                        type="submit"
+                        variants={buttonVariants}
+                        whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(6, 182, 212, 0.4)' }}
+                        whileTap={{ scale: 0.98 }}
+                        className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-8 py-3 transition-all duration-200 rounded-none whitespace-nowrap"
+                      >
+                        Request Audit
+                      </motion.button>
+                    </div>
                   </div>
-                  <div className="flex items-end">
-                    <motion.button
-                      type="submit"
-                      variants={buttonVariants}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-8 py-3 transition-colors duration-200 rounded-none whitespace-nowrap"
+                  {error && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-red-400 text-sm mt-3"
                     >
-                      Request Audit
-                    </motion.button>
-                  </div>
-                </div>
-                {error && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-red-400 text-sm mt-3"
-                  >
-                    {error}
-                  </motion.p>
-                )}
-              </form>
-            )}
+                      {error}
+                    </motion.p>
+                  )}
+                </form>
+              )}
+            </div>
           </motion.div>
         </motion.div>
       </section>
 
+      {/* Stats Bar */}
+      <section className="relative z-10 border-y border-slate-800/80 bg-surface/40 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+          <div className="flex flex-col items-center justify-center">
+            <span className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400 font-mono mb-2">
+              <Counter value={500} suffix="+" />
+            </span>
+            <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold font-mono">
+              AI Workflows Deployed
+            </span>
+          </div>
+          <div className="flex flex-col items-center justify-center border-y md:border-y-0 md:border-x border-slate-800/50 py-6 md:py-0">
+            <span className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400 font-mono mb-2">
+              <Counter value={99.9} suffix="%" decimals={1} />
+            </span>
+            <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold font-mono">
+              System Uptime
+            </span>
+          </div>
+          <div className="flex flex-col items-center justify-center">
+            <span className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400 font-mono mb-2">
+              <Counter value={10} suffix="k+" />
+            </span>
+            <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold font-mono">
+              Hours Saved
+            </span>
+          </div>
+        </div>
+      </section>
+
       {/* Process Section */}
-      <section className="py-20 md:py-28 px-6 border-t border-slate-800">
+      <section className="relative z-10 py-20 md:py-28 px-6 border-t border-slate-800/50">
         <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ duration: 0.8 }}
           className="max-w-6xl mx-auto"
         >
-          <motion.div variants={itemVariants} className="text-center mb-16">
-            <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
+          <div className="text-center mb-16">
+            <p className="text-xs uppercase tracking-widest text-slate-500 mb-3 font-mono">
               WHAT HAPPENS NEXT
             </p>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-100 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-100 mb-4 tracking-tight">
               A transparent, zero-pressure sequence
             </h2>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">
               from first contact to final deliverable.
             </p>
-          </motion.div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
             {steps.map((step, index) => (
               <motion.div
                 key={index}
-                variants={itemVariants}
-                className="bg-surface border border-slate-800 p-8"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ y: -6 }}
+                className="group relative bg-surface/60 backdrop-blur-sm border border-slate-800/80 p-8 hover:border-cyan-500/30 hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.15)] transition-all duration-300 rounded-none cursor-default"
               >
-                <span className="text-5xl font-bold text-cyan-500/30 mb-4 block">
+                <span className="text-5xl font-bold text-cyan-500/10 group-hover:text-cyan-500/25 mb-4 block transition-colors duration-300 font-mono">
                   {step.number}
                 </span>
-                <h3 className="text-xl font-bold text-slate-100 mb-3">
+                <h3 className="text-xl font-bold text-slate-100 group-hover:text-cyan-400 mb-3 transition-colors duration-300">
                   {step.title}
                 </h3>
                 <p className="text-slate-400 leading-relaxed">
@@ -310,38 +469,39 @@ function App() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20 md:py-28 px-6 border-t border-slate-800">
+      <section className="relative z-10 py-20 md:py-28 px-6 border-t border-slate-800/50">
         <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ duration: 0.8 }}
           className="max-w-3xl mx-auto"
         >
-          <motion.div variants={itemVariants} className="text-center mb-12">
-            <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
+          <div className="text-center mb-12">
+            <p className="text-xs uppercase tracking-widest text-slate-500 mb-3 font-mono">
               COMMON QUESTIONS
             </p>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-100">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-100 tracking-tight">
               Frequently asked questions
             </h2>
-          </motion.div>
+          </div>
 
-          <motion.div variants={itemVariants} className="space-y-0">
+          <div className="space-y-0">
             {faqs.map((faq, index) => (
               <div
                 key={index}
-                className="border-b border-slate-800 overflow-hidden"
+                className="border-b border-slate-800/80 overflow-hidden"
               >
                 <button
                   onClick={() => toggleFaq(index)}
-                  className="w-full text-left py-6 flex items-center justify-between gap-4 group"
+                  className="w-full text-left py-6 flex items-center justify-between gap-4 group cursor-pointer"
                 >
-                  <span className="text-lg font-medium text-slate-100 group-hover:text-cyan-400 transition-colors duration-200">
+                  <span className="text-lg font-medium text-slate-200 group-hover:text-cyan-400 transition-colors duration-200">
                     {faq.question}
                   </span>
                   <ChevronDown
-                    className={`w-5 h-5 text-slate-500 transition-transform duration-300 ${
-                      openFaq === index ? 'rotate-180' : ''
+                    className={`w-5 h-5 text-slate-500 group-hover:text-cyan-400 transition-all duration-300 ${
+                      openFaq === index ? 'rotate-180 text-cyan-400' : ''
                     }`}
                   />
                 </button>
@@ -356,39 +516,42 @@ function App() {
                 </div>
               </div>
             ))}
-          </motion.div>
+          </div>
         </motion.div>
       </section>
 
       {/* Closing CTA Section */}
-      <section className="py-20 md:py-28 px-6 border-t border-slate-800">
+      <section className="relative z-10 py-20 md:py-28 px-6 border-t border-slate-800/50">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-          className="max-w-3xl mx-auto text-center bg-surface border border-slate-700 p-12 md:p-16"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ duration: 0.8 }}
+          className="glowing-border-container max-w-3xl mx-auto"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-100 mb-4">
-            Ready to see what's possible?
-          </h2>
-          <p className="text-lg text-slate-400 mb-8">
-            The audit is free, the blueprint is yours, and the next step takes
-            30 seconds.
-          </p>
-          <motion.button
-            onClick={scrollToAuditForm}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="border border-cyan-500 text-cyan-400 hover:bg-cyan-500 hover:text-black font-semibold px-10 py-4 transition-all duration-200 inline-flex items-center gap-2 rounded-none"
-          >
-            Secure Your Free Automation Audit
-            <ArrowRight className="w-5 h-5" />
-          </motion.button>
+          <div className="glowing-border-inner bg-surface/90 backdrop-blur-sm p-12 md:p-16 text-center border border-slate-800/80">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-100 mb-4 tracking-tight">
+              Ready to see what's possible?
+            </h2>
+            <p className="text-lg text-slate-400 mb-8">
+              The audit is free, the blueprint is yours, and the next step takes
+              30 seconds.
+            </p>
+            <motion.button
+              onClick={scrollToAuditForm}
+              whileHover={{ scale: 1.02, boxShadow: '0 0 25px rgba(6, 182, 212, 0.3)' }}
+              whileTap={{ scale: 0.98 }}
+              className="border border-cyan-500 text-cyan-400 hover:bg-cyan-500 hover:text-black font-semibold px-10 py-4 transition-all duration-200 inline-flex items-center gap-2 rounded-none cursor-pointer"
+            >
+              Secure Your Free Automation Audit
+              <ArrowRight className="w-5 h-5" />
+            </motion.button>
+          </div>
         </motion.div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800 py-8 text-center">
+      <footer className="relative z-10 border-t border-slate-800/50 py-8 text-center bg-background/80 backdrop-blur-sm">
         <p className="text-slate-600 text-sm">
           © 2025 Synthesis Automation. All rights reserved.
         </p>
